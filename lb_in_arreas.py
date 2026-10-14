@@ -116,7 +116,7 @@ def main():
     print(f"Tasa = (prod-1)×360/{d_c}: {tasa_compuesta*100:.{dec_tasa}f} %")
     print(f"Tasa compuesta (redondeo {dec_tasa} dec): {tasa_compuesta_pct:.{dec_tasa}f} %")
     print(f"\n--- Paso 3: Tasa Integrada ---")
-    print(f"Tasa final = {tasa_compuesta_pct:.{dec_tasa}f} + {margen:.{dec_tasa}f} = {tasa_final_pct:.{dec_tasa}f} %")
+    print(f"Tasa final = {tasa_compuesta_pct:.{dec_tasa}f}% + {margen:.{dec_tasa}f}% = {tasa_final_pct:.{dec_tasa}f}%")
     print(f"\n--- Paso 4: Intereses (base 360) ---")
     print(f"Intereses = ${capital:,.2f} × {tasa_final_pct:.{dec_tasa}f}% × {d_c}/360")
     print(f"          = ${capital * (tasa_final_pct/100.0):,.2f} × {d_c}/360")

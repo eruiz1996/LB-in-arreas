@@ -120,6 +120,15 @@ class App(tk.Tk):
         )
         style.map("TButton", background=[("active", ROJO_OSCURO)])
         style.configure("TFrame", background=FONDO)
+        style.configure(
+            "Treeview",
+            background=FONDO_CAMPO,
+            fieldbackground=FONDO_CAMPO,
+            foreground=TEXTO,
+            font=("Consolas", 9),
+            rowheight=20,
+        )
+        style.configure("Treeview.Heading", background=MELOCOTON, font=("Segoe UI", 9, "bold"))
 
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
@@ -137,17 +146,17 @@ class App(tk.Tk):
         self.vars = {}
         self.entries = {}
 
-        ttk.Label(izq, text="Fecha inicio:").grid(row=1, column=0, padx=10, pady=6, sticky="e")
+        ttk.Label(izq, text="Fecha inicio:").grid(row=1, column=0, padx=10, pady=4, sticky="e")
         self.vars["inicio"] = tk.StringVar()
         e_inicio = ttk.Entry(izq, textvariable=self.vars["inicio"], width=20)
-        e_inicio.grid(row=1, column=1, padx=5, pady=6, sticky="w")
-        ttk.Button(izq, text="📅", width=4, command=lambda: abrir_calendario(e_inicio, "Fecha inicio")).grid(row=1, column=2, padx=5)
+        e_inicio.grid(row=1, column=1, padx=5, pady=4, sticky="w")
+        ttk.Button(izq, text="📅", width=4, command=lambda: abrir_calendario(e_inicio, "Fecha inicio")).grid(row=1, column=2, padx=5, pady=4)
 
-        ttk.Label(izq, text="Fecha fin (día de pago):").grid(row=2, column=0, padx=10, pady=6, sticky="e")
+        ttk.Label(izq, text="Fecha fin (día de pago):").grid(row=2, column=0, padx=10, pady=4, sticky="e")
         self.vars["final"] = tk.StringVar()
         e_final = ttk.Entry(izq, textvariable=self.vars["final"], width=20)
-        e_final.grid(row=2, column=1, padx=5, pady=6, sticky="w")
-        ttk.Button(izq, text="📅", width=4, command=lambda: abrir_calendario(e_final, "Fecha fin")).grid(row=2, column=2, padx=5)
+        e_final.grid(row=2, column=1, padx=5, pady=4, sticky="w")
+        ttk.Button(izq, text="📅", width=4, command=lambda: abrir_calendario(e_final, "Fecha fin")).grid(row=2, column=2, padx=5, pady=4)
 
         campos = [
             ("Saldo Insoluto:", "capital"),
@@ -158,11 +167,11 @@ class App(tk.Tk):
             ("Decimales tasa:", "dec_tasa"),
         ]
         for r, (label, key) in enumerate(campos, start=3):
-            ttk.Label(izq, text=label).grid(row=r, column=0, padx=10, pady=6, sticky="e")
+            ttk.Label(izq, text=label).grid(row=r, column=0, padx=10, pady=4, sticky="e")
             v = tk.StringVar()
             self.vars[key] = v
             e = ttk.Entry(izq, textvariable=v, width=20, show="*" if key == "token" else "")
-            e.grid(row=r, column=1, padx=5, pady=6, sticky="w")
+            e.grid(row=r, column=1, padx=5, pady=4, sticky="w")
             self.entries[key] = e
             if key == "capital":
                 e.bind("<FocusOut>", lambda ev, e=e: formatear_capital(e))
@@ -171,18 +180,57 @@ class App(tk.Tk):
 
         ttk.Button(izq, text="Calcular", command=self.on_calcular).grid(row=9, column=0, columnspan=3, pady=12)
 
-        self.resultado = tk.Text(izq, width=78, height=28, bg=FONDO_TEXTO, fg=TEXTO, font=("Consolas", 9))
-        self.resultado.grid(row=10, column=0, columnspan=3, padx=5, pady=10, sticky="w")
-        self.resultado.config(state="disabled")
+        ttk.Label(
+            izq, text="Paso 1: Desglose diario (lookback in arreas)",
+            font=("Segoe UI", 11, "bold"), foreground=ROJO,
+        ).grid(row=10, column=0, columnspan=3, sticky="w", padx=5, pady=(6, 2))
 
-        ttk.Label(der, text="Cálculos de la tasa (LaTeX)", font=("Segoe UI", 14, "bold"), foreground=ROJO).pack(
+        marco_tabla = ttk.Frame(izq)
+        marco_tabla.grid(row=11, column=0, columnspan=3, sticky="w", padx=5)
+
+        columnas = ("dia", "tasapub", "r", "ni", "factor")
+        self.tabla = ttk.Treeview(marco_tabla, columns=columnas, show="headings", height=9)
+        encabezados = [
+            ("dia", "Día periodo", 110, "w"),
+            ("tasapub", "Tasa pub. en", 110, "w"),
+            ("r", "R (%)", 80, "e"),
+            ("ni", "n_i", 55, "e"),
+            ("factor", "Factor", 150, "e"),
+        ]
+        for col, titulo, ancho, alinear in encabezados:
+            self.tabla.heading(col, text=titulo)
+            self.tabla.column(col, width=ancho, anchor=alinear, stretch=False)
+        scroll_tabla = ttk.Scrollbar(marco_tabla, orient="vertical", command=self.tabla.yview)
+        self.tabla.configure(yscrollcommand=scroll_tabla.set)
+        scroll_tabla.pack(side="right", fill="y")
+        self.tabla.pack(side="left", fill="both", expand=True)
+        self.tabla.tag_configure("par", background=FONDO_CAMPO)
+        self.tabla.tag_configure("impar", background="#FFF3D6")
+
+        marco_resumen = ttk.Frame(izq)
+        marco_resumen.grid(row=12, column=0, columnspan=3, sticky="w", padx=5, pady=(10, 0))
+
+        self.resumen = tk.Text(
+            marco_resumen, width=72, height=8, bg=FONDO_TEXTO, fg=TEXTO,
+            font=("Consolas", 9), relief="solid", borderwidth=1, padx=8, pady=6,
+        )
+        scroll_resumen = ttk.Scrollbar(marco_resumen, orient="vertical", command=self.resumen.yview)
+        self.resumen.configure(yscrollcommand=scroll_resumen.set)
+        scroll_resumen.pack(side="right", fill="y")
+        self.resumen.pack(side="left", fill="both", expand=True)
+        self.resumen.tag_configure("titulo", font=("Segoe UI", 9, "bold"), foreground=ROJO_OSCURO)
+        self.resumen.tag_configure("dato", font=("Consolas", 9, "bold"))
+        self.resumen.insert("end", "Sin cálculos. Pulsa «Calcular» para ver el detalle.")
+        self.resumen.config(state="disabled")
+
+        ttk.Label(der, text="Detalle tasa", font=("Segoe UI", 14, "bold"), foreground=ROJO).pack(
             anchor="w", pady=(10, 20)
         )
         self.panel_latex = ttk.Frame(der)
         self.panel_latex.pack(anchor="nw", fill="x")
         self.placeholder = ttk.Label(
             self.panel_latex,
-            text="Aquí se mostrarán los cálculos de la tasa\nen formato LaTeX después de pulsar Calcular.",
+            text="Aquí se mostrarán los cálculos de la tasa\ndespués de pulsar Calcular.",
             foreground="#B0B0B0",
         )
         self.placeholder.pack(anchor="w")
@@ -231,33 +279,37 @@ class App(tk.Tk):
             return
 
         d = dec_tasa
-        lineas = [
-            f"Periodo de intereses: {inicio} a {final_periodo}  (pago: {final})",
-            f"Días hábiles: {d_b} | Días calendario: {d_c} | Lookback: {lookback}",
-            f"Decimales cálculo: {dec_calc} | Decimales tasa: {dec_tasa}",
-            "",
-            "--- Paso 1: Desglose diario ---",
-            f"{'Día':<12}{'Tasa pub.':<12}{'R (%)':>10}{'n_i':>5}{'Factor':>16}",
-        ]
-        for dia, fecha_tas, R, n_i, factor in detalle:
-            lineas.append(f"{dia!s:<12}{fecha_tas!s:<12}{R*100:>10.4f}{n_i:>5}{factor:>16.{dec_calc}f}")
-        lineas += [
-            "",
-            "--- Paso 2: Compuesto ---",
-            f"Producto de factores: {producto:.{max(dec_calc, 8)}f}",
-            f"Tasa compuesta TIIE:  {tasa:.{d}f} %",
-            "",
-            "--- Paso 3: Tasa Integrada ---",
-            f"Tasa integrada: {tasa:.{d}f} + {margen:.{d}f} = {tasa_final:.{d}f} %",
-            "",
-            "--- Paso 4: Intereses (base 360) ---",
-            f"Intereses = ${capital:,.2f} × {tasa_final:.{d}f}% × {d_c}/360 = ${intereses:,.2f}",
-        ]
-        texto = "\n".join(lineas)
-        self.resultado.config(state="normal")
-        self.resultado.delete("1.0", "end")
-        self.resultado.insert("1.0", texto)
-        self.resultado.config(state="disabled")
+        for fila in self.tabla.get_children():
+            self.tabla.delete(fila)
+        for idx, (dia, fecha_tas, R, n_i, factor) in enumerate(detalle):
+            self.tabla.insert(
+                "", "end",
+                tags=("par" if idx % 2 == 0 else "impar",),
+                values=(dia, fecha_tas, f"{R * 100:.4f}", n_i, f"{factor:.{dec_calc}f}"),
+            )
+
+        resumen = self.resumen
+        resumen.config(state="normal")
+        resumen.delete("1.0", "end")
+
+        def linea(texto, tag=None):
+            resumen.insert("end", texto + "\n", tag)
+
+        linea(f"Periodo de intereses: {inicio} a {final_periodo}  (pago: {final})")
+        linea(f"Días hábiles: {d_b} | Días calendario: {d_c} | Lookback: {lookback}")
+        linea(f"Decimales cálculo: {dec_calc} | Decimales tasa: {dec_tasa}")
+        linea("")
+        linea("--- Paso 2: Compuesto del periodo ---", "titulo")
+        linea(f"Producto de factores: {producto:.{max(dec_calc, 8)}f}")
+        linea(f"Tasa compuesta TIIE: {tasa:.{d}f} %", "dato")
+        linea("")
+        linea("--- Paso 3: Tasa Integrada ---", "titulo")
+        linea(f"Tasa integrada: {tasa:.{d}f}% + {margen:.{d}f}% = {tasa_final:.{d}f}%", "dato")
+        linea("")
+        linea("--- Paso 4: Intereses (base 360) ---", "titulo")
+        linea(f"Intereses = ${capital:,.2f} × {tasa_final:.{d}f}% × {d_c}/360 = ${intereses:,.2f}", "dato")
+        resumen.yview_moveto(0)
+        resumen.config(state="disabled")
 
         formulas = [
             r"\prod_{i=1}^{" + str(d_b) + r"}\left(1+\frac{R_i\,n_i}{360}\right)"

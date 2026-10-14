@@ -19,12 +19,15 @@ PALETA_TIIE = {
     "enc_tabla": "#FCD898",
     "fila_par": "#FFFFFF",
     "fila_imp": "#FFF3D6",
+    "resaltado": "#FDE4E1",
     "tab": "#FC0000",
     "tab_txt": "#FFFFFF",
     "tab_sel": "#FF3320",
     "tab_unsel": "#E28C88",
     "tab_unsel_txt": "#FFF5F4",
     "nota": "Tasa TIIE diaria (Banxico, serie SF331451) · feriados CNBV · token requerido",
+    "dec_calc": 8,
+    "dec_tasa": 4,
 }
 
 PALETA_SOFR = {
@@ -36,12 +39,15 @@ PALETA_SOFR = {
     "enc_tabla": "#9FE6E9",
     "fila_par": "#FFFFFF",
     "fila_imp": "#E3F7F4",
+    "resaltado": "#DEF8F5",
     "tab": "#00C4CB",
     "tab_txt": "#00343A",
     "tab_sel": "#4FE0E4",
     "tab_unsel": "#9DDFE3",
     "tab_unsel_txt": "#004A4F",
     "nota": "Tasa SOFR diaria (New York Fed) · feriados FED · sin token · ACT/360",
+    "dec_calc": 9,
+    "dec_tasa": 5,
 }
 
 
@@ -130,6 +136,7 @@ class Pestana(tk.Frame):
         self.con_token = con_token
         self._feriados = feriados
         self._fotos = []
+        self.intereses_texto = ""
         self._construir()
 
     def _construir(self):
@@ -143,6 +150,7 @@ class Pestana(tk.Frame):
         der = tk.Frame(self, bg=p["fondo"])
         der.grid(row=0, column=1, sticky="nsew", padx=20, pady=10)
         der.grid_columnconfigure(0, weight=1)
+        self.der = der
 
         tk.Label(
             izq, text=f"Lookback in Arreas — {self.metodo}",
@@ -161,7 +169,7 @@ class Pestana(tk.Frame):
         e_inicio = tk.Entry(izq, textvariable=self.vars["inicio"], width=20, bg=p["campo"], relief="solid", bd=1)
         e_inicio.grid(row=2, column=1, padx=5, pady=4, sticky="w")
         tk.Button(
-            izq, text="📅", width=4, bg=p["acento"], fg="white",
+            izq, text="📅", width=3, bg=p["acento"], fg="white", font=("Segoe UI", 8),
             activebackground=p["acento_osc"],
             command=lambda: abrir_calendario(e_inicio, f"{self.metodo} – Fecha inicio"),
         ).grid(row=2, column=2, padx=5, pady=4)
@@ -173,7 +181,7 @@ class Pestana(tk.Frame):
         e_final = tk.Entry(izq, textvariable=self.vars["final"], width=20, bg=p["campo"], relief="solid", bd=1)
         e_final.grid(row=3, column=1, padx=5, pady=4, sticky="w")
         tk.Button(
-            izq, text="📅", width=4, bg=p["acento"], fg="white",
+            izq, text="📅", width=3, bg=p["acento"], fg="white", font=("Segoe UI", 8),
             activebackground=p["acento_osc"],
             command=lambda: abrir_calendario(e_final, f"{self.metodo} – Fecha fin"),
         ).grid(row=3, column=2, padx=5, pady=4)
@@ -204,34 +212,73 @@ class Pestana(tk.Frame):
             if key == "capital":
                 e.bind("<FocusOut>", lambda ev, e=e: formatear_capital(e))
             fila += 1
-        self.vars["dec_calc"].set("8")
-        self.vars["dec_tasa"].set("4")
+        self.vars["dec_calc"].set(str(p["dec_calc"]))
+        self.vars["dec_tasa"].set(str(p["dec_tasa"]))
 
         fila_boton = fila
         tk.Button(
             izq, text="Calcular", bg=p["acento"], fg="white", activebackground=p["acento_osc"],
             font=("Segoe UI", 10, "bold"), padx=14, pady=4, command=self.on_calcular,
-        ).grid(row=fila_boton, column=0, columnspan=3, pady=12)
+        ).grid(row=fila_boton, column=0, columnspan=3, pady=(12, 8))
+
+        resaltado = tk.Frame(izq, bg=p["resaltado"], highlightbackground=p["acento"],
+                             highlightthickness=2, bd=0)
+        resaltado.grid(row=fila_boton + 1, column=0, columnspan=3, sticky="we", padx=5, pady=(0, 6))
+        tk.Label(
+            resaltado, text="Intereses", font=("Segoe UI", 9, "bold"),
+            fg=p["acento_osc"], bg=p["resaltado"],
+        ).grid(row=0, column=0, padx=(10, 8), pady=6, sticky="w")
+        self.lbl_intereses = tk.Label(
+            resaltado, text="—", font=("Segoe UI", 16, "bold"), fg=p["acento_osc"],
+            bg=p["resaltado"],
+        )
+        self.lbl_intereses.grid(row=0, column=1, padx=4, pady=6, sticky="w")
+        self.btn_copiar = tk.Button(
+            resaltado, text="Copiar", bg=p["acento"], fg="white", activebackground=p["acento_osc"],
+            font=("Segoe UI", 9, "bold"), padx=8, pady=2, command=self.copiar_intereses,
+        )
+        self.btn_copiar.grid(row=0, column=2, padx=(8, 10), pady=6, sticky="e")
+        resaltado.grid_columnconfigure(1, weight=1)
 
         tk.Label(
-            izq, text="Paso 1: Desglose diario (lookback in arreas)",
-            font=("Segoe UI", 11, "bold"), fg=p["acento"], bg=p["fondo"],
-        ).grid(row=fila_boton + 1, column=0, columnspan=3, sticky="w", padx=5, pady=(6, 2))
+            der, text="Detalle tasa", font=("Segoe UI", 14, "bold"),
+            fg=p["acento"], bg=p["fondo"],
+        ).grid(row=0, column=0, sticky="w", pady=(6, 12))
+        self.panel_latex = tk.Frame(der, bg=p["fondo"])
+        self.panel_latex.grid(row=1, column=0, sticky="new")
+        self.placeholder = tk.Label(
+            self.panel_latex,
+            text="Aquí se mostrarán los cálculos de la tasa\ndespués de pulsar Calcular.",
+            fg="#909090", bg=p["fondo"],
+        )
+        self.placeholder.grid(row=0, column=0, sticky="w")
 
-        marco_tabla = tk.Frame(izq, bg=p["fondo"])
-        marco_tabla.grid(row=fila_boton + 2, column=0, columnspan=3, sticky="w", padx=5)
+        marcos = tk.Frame(der, bg=p["fondo"])
+        marcos.grid(row=2, column=0, sticky="new", pady=(14, 0))
+        marcos.grid_columnconfigure(0, weight=1)
+        marcos.grid_columnconfigure(1, weight=1)
+
+        caja_1 = tk.Frame(marcos, bg=p["fondo"])
+        caja_1.grid(row=0, column=0, sticky="new", padx=(0, 10))
+        tk.Label(
+            caja_1, text="Desglose diario", font=("Segoe UI", 11, "bold"),
+            fg=p["acento"], bg=p["fondo"],
+        ).grid(row=0, column=0, sticky="w", pady=(0, 4))
+
+        marco_tabla = tk.Frame(caja_1, bg=p["fondo"])
+        marco_tabla.grid(row=1, column=0, sticky="new")
 
         columnas = ("dia", "tasapub", "r", "ni", "factor")
         self.tabla = ttk.Treeview(
-            marco_tabla, columns=columnas, show="headings", height=9,
+            marco_tabla, columns=columnas, show="headings", height=10,
             style=f"{self.metodo}.Treeview",
         )
         encabezados = [
-            ("dia", "Día periodo", 110, "w"),
-            ("tasapub", "Tasa pub. en", 110, "w"),
-            ("r", "R (%)", 80, "e"),
-            ("ni", "n_i", 55, "e"),
-            ("factor", "Factor", 150, "e"),
+            ("dia", "Día periodo", 105, "w"),
+            ("tasapub", "Tasa pub. en", 105, "w"),
+            ("r", "R (%)", 75, "e"),
+            ("ni", "n_i", 50, "e"),
+            ("factor", "Factor", 145, "e"),
         ]
         for col, titulo, ancho, alinear in encabezados:
             self.tabla.heading(col, text=titulo)
@@ -243,11 +290,18 @@ class Pestana(tk.Frame):
         self.tabla.tag_configure("par", background=p["fila_par"])
         self.tabla.tag_configure("impar", background=p["fila_imp"])
 
-        marco_resumen = tk.Frame(izq, bg=p["fondo"])
-        marco_resumen.grid(row=fila_boton + 3, column=0, columnspan=3, sticky="w", padx=5, pady=(10, 0))
+        caja_2 = tk.Frame(marcos, bg=p["fondo"])
+        caja_2.grid(row=0, column=1, sticky="new", padx=(10, 0))
+        tk.Label(
+            caja_2, text="Cálculo de intereses", font=("Segoe UI", 11, "bold"),
+            fg=p["acento"], bg=p["fondo"],
+        ).grid(row=0, column=0, sticky="w", pady=(0, 4))
+
+        marco_resumen = tk.Frame(caja_2, bg=p["fondo"])
+        marco_resumen.grid(row=1, column=0, sticky="new")
 
         self.resumen = tk.Text(
-            marco_resumen, width=72, height=8, bg=p["caja"], fg="#000000",
+            marco_resumen, width=64, height=14, bg=p["caja"], fg="#000000",
             font=("Consolas", 9), relief="solid", borderwidth=1, padx=8, pady=6,
         )
         scroll_resumen = ttk.Scrollbar(marco_resumen, orient="vertical", command=self.resumen.yview)
@@ -259,24 +313,28 @@ class Pestana(tk.Frame):
         self.resumen.insert("end", "Sin cálculos. Pulsa «Calcular» para ver el detalle.")
         self.resumen.config(state="disabled")
 
-        tk.Label(
-            der, text="Detalle tasa", font=("Segoe UI", 14, "bold"),
-            fg=p["acento"], bg=p["fondo"],
-        ).grid(row=0, column=0, sticky="w", pady=(10, 20))
-        self.panel_latex = tk.Frame(der, bg=p["fondo"])
-        self.panel_latex.grid(row=1, column=0, sticky="new")
-        self.placeholder = tk.Label(
-            self.panel_latex,
-            text="Aquí se mostrarán los cálculos de la tasa\ndespués de pulsar Calcular.",
-            fg="#909090", bg=p["fondo"],
-        )
-        self.placeholder.grid(row=0, column=0, sticky="w")
+    def copiar_intereses(self):
+        if not self.intereses_texto:
+            return
+        self.clipboard_clear()
+        self.clipboard_append(self.intereses_texto)
+        self.btn_copiar.config(text="¡Copiado!")
+        self.after(1500, lambda: self.btn_copiar.config(text="Copiar"))
 
     def mostrar_latex(self, formulas):
+        self._formulas = formulas
+        self._render_latex()
+
+    def _render_latex(self):
+        formulas = getattr(self, "_formulas", None)
+        if not formulas:
+            return
         for w in self.panel_latex.winfo_children():
             w.destroy()
         self._fotos = []
-        max_w = self.panel_latex.winfo_width() or 800
+        max_w = self.panel_latex.winfo_width()
+        if max_w < 100:
+            max_w = 900
         for tex in formulas:
             try:
                 foto = latex_photo(tex, dpi=150)
@@ -325,6 +383,9 @@ class Pestana(tk.Frame):
         except Exception as e:
             messagebox.showerror("Error", f"Fallo al consultar la API: {e}")
             return
+
+        self.intereses_texto = f"{intereses:,.2f}"
+        self.lbl_intereses.config(text=f"${self.intereses_texto}")
 
         d = dec_tasa
         for fila in self.tabla.get_children():
@@ -406,13 +467,13 @@ class App(tk.Tk):
         self.tab_sofr = Pestana(self.contenido, "SOFR", PALETA_SOFR, False, holidays.US())
 
         self.btns = {}
-        for metodo, texto in (("TIIE", " TIIE (Banxico) "), ("SOFR", " SOFR (FED) ")):
+        for metodo, texto in (("TIIE", "TIIE (Banxico)"), ("SOFR", "SOFR (FED)")):
             btn = tk.Button(
                 barra, text=texto, bd=0, relief="flat", cursor="hand2",
-                font=("Segoe UI", 11, "bold"), padx=18, pady=7,
+                font=("Segoe UI", 9, "bold"), padx=10, pady=3,
                 command=lambda m=metodo: self.mostrar(m),
             )
-            btn.pack(side="left", padx=(10, 0), pady=6)
+            btn.pack(side="left", padx=(8, 0), pady=4)
             self.btns[metodo] = btn
 
         self.actual = None
@@ -427,9 +488,14 @@ class App(tk.Tk):
             self.tab_sofr.pack_forget()
         if metodo == "TIIE":
             self.tab_tiie.pack(fill="both", expand=True)
-        else:
-            self.tab_sofr.pack(fill="both", expand=True)
+            self.actual = metodo
+            self.update_idletasks()
+            self.tab_tiie._render_latex()
+            return
+        self.tab_sofr.pack(fill="both", expand=True)
         self.actual = metodo
+        self.update_idletasks()
+        self.tab_sofr._render_latex()
 
         for m, btn in self.btns.items():
             p = PALETA_TIIE if m == "TIIE" else PALETA_SOFR

@@ -17,9 +17,9 @@ Programa para calcular intereses bajo la metodología de tasa **Lookback in Arre
 
   $$\text{Tasa}=\left[\prod _{i=1}^{d_{b}}\left(1+\frac{R_{i}\times n_{i}}{N}\right)-1\right]\times \frac{N}{d_{c}}$$
 
-- Redondeo configurable: decimales de cálculo (factores, por defecto 8) y decimales de tasa (por defecto 4).
+- Redondeo configurable: decimales de cálculo (factores) y decimales de tasa, con valores por defecto 8/4 en TIIE y 9/5 en SOFR.
 - Intereses con base 360 días (convención ACT/360).
-- Interfaz gráfica en Tkinter con pestañas diferenciadas por color (TIIE rojo Santander, SOFR turquesa), calendarios desplegables (`tkcalendar`), tabla del desglose diario y fórmulas LaTeX de la tasa.
+- Interfaz gráfica en Tkinter con pestañas diferenciadas por color (TIIE rojo Santander, SOFR turquesa), calendarios desplegables (`tkcalendar`), tabla del desglose diario y fórmulas LaTeX de la tasa. Debajo del botón «Calcular» se resalta el resultado de los **intereses**, con botón «Copiar» para llevarlo al portapapeles.
 - Desglose paso a paso del cálculo.
 
 ## Instalación
@@ -44,7 +44,7 @@ Interfaz gráfica:
 python lb_gui.py
 ```
 
-La interfaz tiene dos pestañas —**TIIE** y **SOFR**— con los mismos campos (fecha inicio, fecha fin como día de pago, saldo insoluto, margen, lookback, decimales de cálculo y de tasa). La pestaña TIIE incluye además el campo de token; SOFR no lo necesita.
+La interfaz tiene dos pestañas —**TIIE** y **SOFR**— con los mismos campos (fecha inicio, fecha fin como día de pago, saldo insoluto, margen, lookback, decimales de cálculo y de tasa). La pestaña TIIE incluye además el campo de token; SOFR no lo necesita. A la derecha se muestra el «Detalle tasa» con las fórmulas del resultado y, debajo, el «Desglose diario» y el «Cálculo de intereses».
 
 ## Estructura
 

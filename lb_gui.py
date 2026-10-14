@@ -1,6 +1,6 @@
 import tkinter as tk
 from datetime import datetime, timedelta
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import messagebox, ttk
 
 import holidays
 from tkcalendar import Calendar
@@ -16,7 +16,7 @@ MELOCOTON = "#FCD898"
 TEXTO = "#000000"
 
 
-def calcular(capital, inicio, final, margen, lookback, token):
+def calcular(capital, inicio, final, margen, lookback, token, decimales):
     feriados = holidays.Mexico()
     final_periodo = final - timedelta(days=1)
     periodo = dias_habiles(inicio, final_periodo, feriados)
@@ -45,8 +45,8 @@ def calcular(capital, inicio, final, margen, lookback, token):
         producto *= factor
         detalle.append((dia, fecha_tas, R, n_i, factor))
 
-    tasa_pct = round((producto - 1) * 360.0 / d_c * 100, 8)
-    tasa_final = round(tasa_pct + margen, 8)
+    tasa_pct = round((producto - 1) * 360.0 / d_c * 100, decimales)
+    tasa_final = round(tasa_pct + margen, decimales)
     intereses = capital * (tasa_final / 100.0) * d_c / 360.0
     return d_b, d_c, tasa_pct, tasa_final, intereses, producto, detalle, final_periodo
 
@@ -81,7 +81,6 @@ class App(tk.Tk):
         super().__init__()
         self.title("Lookback in Arreas")
         self.configure(bg=FONDO)
-        self.token = None
 
         style = ttk.Style(self)
         style.theme_use("clam")
@@ -120,30 +119,37 @@ class App(tk.Tk):
             ("Saldo Insoluto:", "capital"),
             ("Margen (%):", "margen"),
             ("Lookback (días):", "lookback"),
+            ("Token Banxico:", "token"),
         ]
         for r, (label, key) in enumerate(campos, start=3):
             ttk.Label(self, text=label).grid(row=r, column=0, padx=10, pady=6, sticky="e")
             v = tk.StringVar()
             self.vars[key] = v
-            e = ttk.Entry(self, textvariable=v, width=20)
+            e = ttk.Entry(self, textvariable=v, width=20, show="*" if key == "token" else "")
             e.grid(row=r, column=1, padx=5, pady=6, sticky="w")
             self.entries[key] = e
             if key == "capital":
                 e.bind("<FocusOut>", lambda ev, e=e: formatear_capital(e))
 
-        ttk.Button(self, text="Calcular", command=self.on_calcular).grid(row=6, column=0, columnspan=3, pady=12)
+        ttk.Label(self, text="Decimales:").grid(row=7, column=0, padx=10, pady=6, sticky="e")
+        self.decimales = ttk.Combobox(
+            self, values=[str(d) for d in range(6, 13)], state="readonly", width=18
+        )
+        self.decimales.set("8")
+        self.decimales.grid(row=7, column=1, padx=5, pady=6, sticky="w")
+
+        ttk.Button(self, text="Calcular", command=self.on_calcular).grid(row=8, column=0, columnspan=3, pady=12)
 
         self.resultado = tk.Text(self, width=75, height=26, bg=FONDO_TEXTO, fg=TEXTO, font=("Consolas", 9))
-        self.resultado.grid(row=7, column=0, columnspan=3, padx=10, pady=10)
+        self.resultado.grid(row=9, column=0, columnspan=3, padx=10, pady=10)
         self.resultado.config(state="disabled")
 
     def on_calcular(self):
-        if not self.token:
-            self.token = simpledialog.askstring(
-                "Token", "Token de Banxico:", show="*", parent=self
-            )
-            if not self.token:
-                return
+        token = self.vars["token"].get().strip()
+        if not token:
+            messagebox.showerror("Error", "Ingresa tu token de Banxico.")
+            return
+        decimales = int(self.decimales.get())
         try:
             inicio = datetime.strptime(self.vars["inicio"].get().strip(), "%Y-%m-%d").date()
             final = datetime.strptime(self.vars["final"].get().strip(), "%Y-%m-%d").date()
@@ -151,7 +157,7 @@ class App(tk.Tk):
             margen = float(self.vars["margen"].get())
             lookback = int(self.vars["lookback"].get())
             d_b, d_c, tasa, tasa_final, intereses, producto, detalle, final_periodo = calcular(
-                capital, inicio, final, margen, lookback, self.token
+                capital, inicio, final, margen, lookback, token, decimales
             )
         except ValueError as e:
             messagebox.showerror("Error", str(e))
@@ -160,9 +166,10 @@ class App(tk.Tk):
             messagebox.showerror("Error", f"Fallo al consultar Banxico: {e}")
             return
 
+        d = decimales
         lineas = [
             f"Periodo de intereses: {inicio} a {final_periodo}  (pago: {final})",
-            f"Días hábiles: {d_b} | Días calendario: {d_c} | Lookback: {lookback}",
+            f"Días hábiles: {d_b} | Días calendario: {d_c} | Lookback: {lookback} | Decimales: {d}",
             "",
             "--- Paso 1: Desglose diario ---",
             f"{'Día':<12}{'Tasa pub.':<12}{'R (%)':>10}{'n_i':>5}{'Factor':>16}",
@@ -173,13 +180,13 @@ class App(tk.Tk):
             "",
             "--- Paso 2: Compuesto ---",
             f"Producto de factores: {producto:.10f}",
-            f"Tasa compuesta TIIE:  {tasa:.8f} %",
+            f"Tasa compuesta TIIE:  {tasa:.{d}f} %",
             "",
             "--- Paso 3: Tasa Integrada ---",
-            f"Tasa integrada: {tasa:.8f} + {margen:.8f} = {tasa_final:.8f} %",
+            f"Tasa integrada: {tasa:.{d}f} + {margen:.{d}f} = {tasa_final:.{d}f} %",
             "",
             "--- Paso 4: Intereses (base 360) ---",
-            f"Intereses = ${capital:,.2f} × {tasa_final}% × {d_c}/360 = ${intereses:,.2f}",
+            f"Intereses = ${capital:,.2f} × {tasa_final:.{d}f}% × {d_c}/360 = ${intereses:,.2f}",
         ]
         texto = "\n".join(lineas)
         self.resultado.config(state="normal")

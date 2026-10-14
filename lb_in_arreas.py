@@ -49,6 +49,11 @@ def main():
     final = datetime.strptime(input("Fecha fin (AAAA-MM-DD): "), "%Y-%m-%d").date()
     margen = float(input("Margen (%): "))
     lookback = int(input("Lookback (días hábiles): "))
+    dec_txt = input("Decimales de redondeo (6-12, Enter=8): ").strip()
+    decimales = int(dec_txt) if dec_txt else 8
+    if not 6 <= decimales <= 12:
+        print("Los decimales deben estar entre 6 y 12.")
+        return
 
     feriados = holidays.Mexico()
     final_periodo = final - timedelta(days=1)
@@ -90,14 +95,14 @@ def main():
         return
 
     tasa_compuesta = (producto - 1) * 360.0 / d_c
-    tasa_compuesta_pct = round(tasa_compuesta * 100, 8)
-    tasa_final_pct = round(tasa_compuesta_pct + margen, 8)
+    tasa_compuesta_pct = round(tasa_compuesta * 100, decimales)
+    tasa_final_pct = round(tasa_compuesta_pct + margen, decimales)
     intereses = capital * (tasa_final_pct / 100.0) * d_c / 360.0
 
     print("\n----- L O O K B A C K   I N   A R R E A S -----")
     print(f"Capital:           ${capital:,.2f}")
     print(f"Periodo:           {inicio} a {final}")
-    print(f"Días hábiles(d_b): {d_b} | Días calendario(d_c): {d_c} | Lookback: {lookback}")
+    print(f"Días hábiles(d_b): {d_b} | Días calendario(d_c): {d_c} | Lookback: {lookback} | Decimales: {decimales}")
     print("\n--- Paso 1: Desglose diario (lookback in arreas) ---")
     print(f"{'Día periodo':<12}{'Tasa pub. en':<14}{'R (%)':>8}{'n_i':>5}{'Factor (1+R·n/360)':>20}")
     for dia, fecha_tas, R, n_i, factor in detalle:
@@ -105,12 +110,12 @@ def main():
     print(f"\n--- Paso 2: Compuesto del periodo ---")
     print(f"Producto de factores:  {producto:.10f}")
     print(f"Producto - 1:          {producto - 1:.10f}")
-    print(f"Tasa = (prod-1)×360/{d_c}: {tasa_compuesta*100:.8f} %")
-    print(f"Tasa compuesta (redondeo 8 dec): {tasa_compuesta_pct:.8f} %")
+    print(f"Tasa = (prod-1)×360/{d_c}: {tasa_compuesta*100:.{decimales}f} %")
+    print(f"Tasa compuesta (redondeo {decimales} dec): {tasa_compuesta_pct:.{decimales}f} %")
     print(f"\n--- Paso 3: Tasa Integrada ---")
-    print(f"Tasa final = {tasa_compuesta_pct:.8f} + {margen:.8f} = {tasa_final_pct:.8f} %")
+    print(f"Tasa final = {tasa_compuesta_pct:.{decimales}f} + {margen:.{decimales}f} = {tasa_final_pct:.{decimales}f} %")
     print(f"\n--- Paso 4: Intereses (base 360) ---")
-    print(f"Intereses = ${capital:,.2f} × {tasa_final_pct}% × {d_c}/360")
+    print(f"Intereses = ${capital:,.2f} × {tasa_final_pct:.{decimales}f}% × {d_c}/360")
     print(f"          = ${capital * (tasa_final_pct/100.0):,.2f} × {d_c}/360")
     print(f"          = ${intereses:,.2f}")
 

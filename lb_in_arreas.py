@@ -10,6 +10,7 @@ URL = (
     + SERIE
     + "/datos/{ini}/{fin}"
 )
+URL_SOFR = "https://markets.newyorkfed.org/api/rates/secured/sofr/search.json"
 
 
 def es_habil(d, feriados):
@@ -41,9 +42,28 @@ def obtener_tasas_banxico(ini, fin, token):
     return tasas
 
 
+def obtener_tasas_sofr(ini, fin):
+    r = requests.get(
+        URL_SOFR,
+        params={"startDate": ini.strftime("%Y-%m-%d"), "endDate": fin.strftime("%Y-%m-%d")},
+        timeout=30,
+    )
+    r.raise_for_status()
+    tasas = {}
+    for dato in r.json()["refRates"]:
+        fecha = datetime.strptime(dato["effectiveDate"], "%Y-%m-%d").date()
+        tasas[fecha] = float(dato["percentRate"]) / 100.0
+    return tasas
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
-    token = input("Token de Banxico: ").strip()
+    metodo = input("Metodología (TIIE/SOFR) [Enter=TIIE]: ").strip().upper() or "TIIE"
+    if metodo not in ("TIIE", "SOFR"):
+        print("Metodología no válida (usa TIIE o SOFR).")
+        return
+    es_tiie = metodo == "TIIE"
+    token = input("Token de Banxico: ").strip() if es_tiie else None
     capital = float(input("Capital: "))
     inicio = datetime.strptime(input("Fecha inicio (AAAA-MM-DD): "), "%Y-%m-%d").date()
     final = datetime.strptime(input("Fecha fin (AAAA-MM-DD): "), "%Y-%m-%d").date()
@@ -57,7 +77,7 @@ def main():
         print("Los decimales deben ser enteros positivos.")
         return
 
-    feriados = holidays.Mexico()
+    feriados = holidays.Mexico() if es_tiie else holidays.US()
     final_periodo = final - timedelta(days=1)
     periodo = dias_habiles(inicio, final_periodo, feriados)
     if not periodo:
@@ -69,7 +89,10 @@ def main():
 
     # Días hábiles con tasas (para desfase lookback se consulta antes del inicio)
     ventana_ini = inicio - timedelta(days=max(60, lookback * 3))
-    tasas_pub = obtener_tasas_banxico(ventana_ini, final_periodo, token)
+    if es_tiie:
+        tasas_pub = obtener_tasas_banxico(ventana_ini, final_periodo, token)
+    else:
+        tasas_pub = obtener_tasas_sofr(ventana_ini, final_periodo)
     fechas_tasas = sorted(tasas_pub)
 
     # Para cada día hábil i del periodo, la tasa aplica es la publicada
@@ -102,6 +125,7 @@ def main():
     intereses = capital * (tasa_final_pct / 100.0) * d_c / 360.0
 
     print("\n----- L O O K B A C K   I N   A R R E A S -----")
+    print(f"Metodología:  {metodo} (calendario {'CNBV/México' if es_tiie else 'FED/EE. UU.'})")
     print(f"Capital:           ${capital:,.2f}")
     print(f"Periodo:           {inicio} a {final}")
     print(f"Días hábiles(d_b): {d_b} | Días calendario(d_c): {d_c} | Lookback: {lookback}")

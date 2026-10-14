@@ -8,19 +8,44 @@ import holidays
 from matplotlib.figure import Figure
 from tkcalendar import Calendar
 
-from lb_in_arreas import dias_habiles, obtener_tasas_banxico
+from lb_in_arreas import dias_habiles, obtener_tasas_banxico, obtener_tasas_sofr
 
-FONDO = "#FFF9DF"
-FONDO_CAMPO = "#FFFFFF"
-FONDO_TEXTO = "#F7E9DF"
-ROJO = "#FC0000"
-ROJO_OSCURO = "#B20100"
-MELOCOTON = "#FCD898"
-TEXTO = "#000000"
+PALETA_TIIE = {
+    "fondo": "#FFF9DF",
+    "campo": "#FFFFFF",
+    "caja": "#F7E9DF",
+    "acento": "#FC0000",
+    "acento_osc": "#B20100",
+    "enc_tabla": "#FCD898",
+    "fila_par": "#FFFFFF",
+    "fila_imp": "#FFF3D6",
+    "tab": "#FC0000",
+    "tab_txt": "#FFFFFF",
+    "tab_sel": "#FF3320",
+    "tab_unsel": "#E28C88",
+    "tab_unsel_txt": "#FFF5F4",
+    "nota": "Tasa TIIE diaria (Banxico, serie SF331451) · feriados CNBV · token requerido",
+}
+
+PALETA_SOFR = {
+    "fondo": "#EAF9FA",
+    "campo": "#FFFFFF",
+    "caja": "#DFF6F7",
+    "acento": "#00B38D",
+    "acento_osc": "#008E6B",
+    "enc_tabla": "#9FE6E9",
+    "fila_par": "#FFFFFF",
+    "fila_imp": "#E3F7F4",
+    "tab": "#00C4CB",
+    "tab_txt": "#00343A",
+    "tab_sel": "#4FE0E4",
+    "tab_unsel": "#9DDFE3",
+    "tab_unsel_txt": "#004A4F",
+    "nota": "Tasa SOFR diaria (New York Fed) · feriados FED · sin token · ACT/360",
+}
 
 
-def calcular(capital, inicio, final, margen, lookback, token, dec_calc, dec_tasa):
-    feriados = holidays.Mexico()
+def calcular(capital, inicio, final, margen, lookback, dec_calc, dec_tasa, feriados, obtener_tasas):
     final_periodo = final - timedelta(days=1)
     periodo = dias_habiles(inicio, final_periodo, feriados)
     if not periodo:
@@ -30,7 +55,7 @@ def calcular(capital, inicio, final, margen, lookback, token, dec_calc, dec_tasa
     d_b = len(periodo)
 
     ventana_ini = inicio - timedelta(days=max(60, lookback * 3))
-    tasas_pub = obtener_tasas_banxico(ventana_ini, final_periodo, token)
+    tasas_pub = obtener_tasas(ventana_ini, final_periodo)
     fechas_tasas = sorted(tasas_pub)
     indices = {f: i for i, f in enumerate(fechas_tasas)}
 
@@ -75,7 +100,7 @@ def abrir_calendario(entry, titulo):
         entry.insert(0, cal.get_date())
         top.destroy()
 
-    tk.Button(top, text="Aceptar", bg=ROJO, fg="white", command=seleccionar).pack(pady=5)
+    tk.Button(top, text="Aceptar", bg="#333333", fg="white", command=seleccionar).pack(pady=5)
 
 
 def formatear_capital(entry):
@@ -97,99 +122,110 @@ def leer_entero(valor, nombre):
     return n
 
 
-class App(tk.Tk):
-    def __init__(self):
-        super().__init__()
-        self.title("Lookback in Arreas")
-        self.configure(bg=FONDO)
-        try:
-            self.state("zoomed")
-        except tk.TclError:
-            self.attributes("-zoomed", True)
+class Pestana(tk.Frame):
+    def __init__(self, master, metodo, paleta, con_token, feriados):
+        super().__init__(master, bg=paleta["fondo"])
+        self.metodo = metodo
+        self.p = paleta
+        self.con_token = con_token
+        self._feriados = feriados
+        self._fotos = []
+        self._construir()
 
-        style = ttk.Style(self)
-        style.theme_use("clam")
-        style.configure("TLabel", background=FONDO, foreground=TEXTO, font=("Segoe UI", 10))
-        style.configure("TEntry", fieldbackground=FONDO_CAMPO, font=("Segoe UI", 10))
-        style.configure(
-            "TButton",
-            background=ROJO,
-            foreground="white",
-            font=("Segoe UI", 10, "bold"),
-            padding=6,
-        )
-        style.map("TButton", background=[("active", ROJO_OSCURO)])
-        style.configure("TFrame", background=FONDO)
-        style.configure(
-            "Treeview",
-            background=FONDO_CAMPO,
-            fieldbackground=FONDO_CAMPO,
-            foreground=TEXTO,
-            font=("Consolas", 9),
-            rowheight=20,
-        )
-        style.configure("Treeview.Heading", background=MELOCOTON, font=("Segoe UI", 9, "bold"))
-
+    def _construir(self):
+        p = self.p
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        izq = ttk.Frame(self)
+        izq = tk.Frame(self, bg=p["fondo"])
         izq.grid(row=0, column=0, sticky="nw", padx=20, pady=10)
-        der = ttk.Frame(self)
+        der = tk.Frame(self, bg=p["fondo"])
         der.grid(row=0, column=1, sticky="nsew", padx=20, pady=10)
+        der.grid_columnconfigure(0, weight=1)
 
-        ttk.Label(izq, text="Lookback in Arreas", font=("Segoe UI", 14, "bold"), foreground=ROJO).grid(
-            row=0, column=0, columnspan=3, pady=10
-        )
+        tk.Label(
+            izq, text=f"Lookback in Arreas — {self.metodo}",
+            font=("Segoe UI", 14, "bold"), fg=p["acento"], bg=p["fondo"],
+        ).grid(row=0, column=0, columnspan=3, pady=(10, 2))
+        tk.Label(
+            izq, text=p["nota"], font=("Segoe UI", 8), fg="#555555", bg=p["fondo"],
+        ).grid(row=1, column=0, columnspan=3, pady=(0, 8))
 
         self.vars = {}
-        self.entries = {}
 
-        ttk.Label(izq, text="Fecha inicio:").grid(row=1, column=0, padx=10, pady=4, sticky="e")
+        tk.Label(izq, text="Fecha inicio:", bg=p["fondo"], font=("Segoe UI", 10)).grid(
+            row=2, column=0, padx=10, pady=4, sticky="e"
+        )
         self.vars["inicio"] = tk.StringVar()
-        e_inicio = ttk.Entry(izq, textvariable=self.vars["inicio"], width=20)
-        e_inicio.grid(row=1, column=1, padx=5, pady=4, sticky="w")
-        ttk.Button(izq, text="📅", width=4, command=lambda: abrir_calendario(e_inicio, "Fecha inicio")).grid(row=1, column=2, padx=5, pady=4)
+        e_inicio = tk.Entry(izq, textvariable=self.vars["inicio"], width=20, bg=p["campo"], relief="solid", bd=1)
+        e_inicio.grid(row=2, column=1, padx=5, pady=4, sticky="w")
+        tk.Button(
+            izq, text="📅", width=4, bg=p["acento"], fg="white",
+            activebackground=p["acento_osc"],
+            command=lambda: abrir_calendario(e_inicio, f"{self.metodo} – Fecha inicio"),
+        ).grid(row=2, column=2, padx=5, pady=4)
 
-        ttk.Label(izq, text="Fecha fin (día de pago):").grid(row=2, column=0, padx=10, pady=4, sticky="e")
+        tk.Label(izq, text="Fecha fin (día de pago):", bg=p["fondo"], font=("Segoe UI", 10)).grid(
+            row=3, column=0, padx=10, pady=4, sticky="e"
+        )
         self.vars["final"] = tk.StringVar()
-        e_final = ttk.Entry(izq, textvariable=self.vars["final"], width=20)
-        e_final.grid(row=2, column=1, padx=5, pady=4, sticky="w")
-        ttk.Button(izq, text="📅", width=4, command=lambda: abrir_calendario(e_final, "Fecha fin")).grid(row=2, column=2, padx=5, pady=4)
+        e_final = tk.Entry(izq, textvariable=self.vars["final"], width=20, bg=p["campo"], relief="solid", bd=1)
+        e_final.grid(row=3, column=1, padx=5, pady=4, sticky="w")
+        tk.Button(
+            izq, text="📅", width=4, bg=p["acento"], fg="white",
+            activebackground=p["acento_osc"],
+            command=lambda: abrir_calendario(e_final, f"{self.metodo} – Fecha fin"),
+        ).grid(row=3, column=2, padx=5, pady=4)
 
         campos = [
             ("Saldo Insoluto:", "capital"),
             ("Margen (%):", "margen"),
             ("Lookback (días):", "lookback"),
-            ("Token Banxico:", "token"),
+        ]
+        if self.con_token:
+            campos.append(("Token Banxico:", "token"))
+        campos += [
             ("Decimales cálculo:", "dec_calc"),
             ("Decimales tasa:", "dec_tasa"),
         ]
-        for r, (label, key) in enumerate(campos, start=3):
-            ttk.Label(izq, text=label).grid(row=r, column=0, padx=10, pady=4, sticky="e")
+        fila = 4
+        for label, key in campos:
+            tk.Label(izq, text=label, bg=p["fondo"], font=("Segoe UI", 10)).grid(
+                row=fila, column=0, padx=10, pady=4, sticky="e"
+            )
             v = tk.StringVar()
             self.vars[key] = v
-            e = ttk.Entry(izq, textvariable=v, width=20, show="*" if key == "token" else "")
-            e.grid(row=r, column=1, padx=5, pady=4, sticky="w")
-            self.entries[key] = e
+            e = tk.Entry(
+                izq, textvariable=v, width=20, bg=p["campo"], relief="solid", bd=1,
+                show="*" if key == "token" else "",
+            )
+            e.grid(row=fila, column=1, padx=5, pady=4, sticky="w")
             if key == "capital":
                 e.bind("<FocusOut>", lambda ev, e=e: formatear_capital(e))
+            fila += 1
         self.vars["dec_calc"].set("8")
         self.vars["dec_tasa"].set("4")
 
-        ttk.Button(izq, text="Calcular", command=self.on_calcular).grid(row=9, column=0, columnspan=3, pady=12)
+        fila_boton = fila
+        tk.Button(
+            izq, text="Calcular", bg=p["acento"], fg="white", activebackground=p["acento_osc"],
+            font=("Segoe UI", 10, "bold"), padx=14, pady=4, command=self.on_calcular,
+        ).grid(row=fila_boton, column=0, columnspan=3, pady=12)
 
-        ttk.Label(
+        tk.Label(
             izq, text="Paso 1: Desglose diario (lookback in arreas)",
-            font=("Segoe UI", 11, "bold"), foreground=ROJO,
-        ).grid(row=10, column=0, columnspan=3, sticky="w", padx=5, pady=(6, 2))
+            font=("Segoe UI", 11, "bold"), fg=p["acento"], bg=p["fondo"],
+        ).grid(row=fila_boton + 1, column=0, columnspan=3, sticky="w", padx=5, pady=(6, 2))
 
-        marco_tabla = ttk.Frame(izq)
-        marco_tabla.grid(row=11, column=0, columnspan=3, sticky="w", padx=5)
+        marco_tabla = tk.Frame(izq, bg=p["fondo"])
+        marco_tabla.grid(row=fila_boton + 2, column=0, columnspan=3, sticky="w", padx=5)
 
         columnas = ("dia", "tasapub", "r", "ni", "factor")
-        self.tabla = ttk.Treeview(marco_tabla, columns=columnas, show="headings", height=9)
+        self.tabla = ttk.Treeview(
+            marco_tabla, columns=columnas, show="headings", height=9,
+            style=f"{self.metodo}.Treeview",
+        )
         encabezados = [
             ("dia", "Día periodo", 110, "w"),
             ("tasapub", "Tasa pub. en", 110, "w"),
@@ -204,37 +240,37 @@ class App(tk.Tk):
         self.tabla.configure(yscrollcommand=scroll_tabla.set)
         scroll_tabla.pack(side="right", fill="y")
         self.tabla.pack(side="left", fill="both", expand=True)
-        self.tabla.tag_configure("par", background=FONDO_CAMPO)
-        self.tabla.tag_configure("impar", background="#FFF3D6")
+        self.tabla.tag_configure("par", background=p["fila_par"])
+        self.tabla.tag_configure("impar", background=p["fila_imp"])
 
-        marco_resumen = ttk.Frame(izq)
-        marco_resumen.grid(row=12, column=0, columnspan=3, sticky="w", padx=5, pady=(10, 0))
+        marco_resumen = tk.Frame(izq, bg=p["fondo"])
+        marco_resumen.grid(row=fila_boton + 3, column=0, columnspan=3, sticky="w", padx=5, pady=(10, 0))
 
         self.resumen = tk.Text(
-            marco_resumen, width=72, height=8, bg=FONDO_TEXTO, fg=TEXTO,
+            marco_resumen, width=72, height=8, bg=p["caja"], fg="#000000",
             font=("Consolas", 9), relief="solid", borderwidth=1, padx=8, pady=6,
         )
         scroll_resumen = ttk.Scrollbar(marco_resumen, orient="vertical", command=self.resumen.yview)
         self.resumen.configure(yscrollcommand=scroll_resumen.set)
         scroll_resumen.pack(side="right", fill="y")
         self.resumen.pack(side="left", fill="both", expand=True)
-        self.resumen.tag_configure("titulo", font=("Segoe UI", 9, "bold"), foreground=ROJO_OSCURO)
+        self.resumen.tag_configure("titulo", font=("Segoe UI", 9, "bold"), foreground=p["acento_osc"])
         self.resumen.tag_configure("dato", font=("Consolas", 9, "bold"))
         self.resumen.insert("end", "Sin cálculos. Pulsa «Calcular» para ver el detalle.")
         self.resumen.config(state="disabled")
 
-        ttk.Label(der, text="Detalle tasa", font=("Segoe UI", 14, "bold"), foreground=ROJO).pack(
-            anchor="w", pady=(10, 20)
-        )
-        self.panel_latex = ttk.Frame(der)
-        self.panel_latex.pack(anchor="nw", fill="x")
-        self.placeholder = ttk.Label(
+        tk.Label(
+            der, text="Detalle tasa", font=("Segoe UI", 14, "bold"),
+            fg=p["acento"], bg=p["fondo"],
+        ).grid(row=0, column=0, sticky="w", pady=(10, 20))
+        self.panel_latex = tk.Frame(der, bg=p["fondo"])
+        self.panel_latex.grid(row=1, column=0, sticky="new")
+        self.placeholder = tk.Label(
             self.panel_latex,
             text="Aquí se mostrarán los cálculos de la tasa\ndespués de pulsar Calcular.",
-            foreground="#B0B0B0",
+            fg="#909090", bg=p["fondo"],
         )
-        self.placeholder.pack(anchor="w")
-        self._fotos = []
+        self.placeholder.grid(row=0, column=0, sticky="w")
 
     def mostrar_latex(self, formulas):
         for w in self.panel_latex.winfo_children():
@@ -248,18 +284,24 @@ class App(tk.Tk):
                     dpi = max(int(150 * max_w * 0.98 / foto.width()), 30)
                     foto = latex_photo(tex, dpi=dpi)
             except Exception as e:
-                lbl = ttk.Label(self.panel_latex, text=f"[Error al renderizar: {e}]", foreground=ROJO_OSCURO)
-                lbl.pack(anchor="w", pady=4)
+                lbl = tk.Label(
+                    self.panel_latex, text=f"[Error al renderizar: {e}]",
+                    fg="#B20100", bg=self.p["fondo"],
+                )
+                lbl.grid(sticky="w", pady=4)
                 continue
             self._fotos.append(foto)
-            lbl = ttk.Label(self.panel_latex, image=foto)
-            lbl.pack(anchor="w", pady=8)
+            lbl = tk.Label(self.panel_latex, image=foto, bg=self.p["fondo"])
+            lbl.grid(sticky="w", pady=8)
 
     def on_calcular(self):
-        token = self.vars["token"].get().strip()
-        if not token:
-            messagebox.showerror("Error", "Ingresa tu token de Banxico.")
-            return
+        p = self.p
+        token = None
+        if self.con_token:
+            token = self.vars["token"].get().strip()
+            if not token:
+                messagebox.showerror("Error", "Ingresa tu token de Banxico.")
+                return
         try:
             dec_calc = leer_entero(self.vars["dec_calc"].get().strip(), "Decimales cálculo")
             dec_tasa = leer_entero(self.vars["dec_tasa"].get().strip(), "Decimales tasa")
@@ -268,14 +310,20 @@ class App(tk.Tk):
             capital = float(self.vars["capital"].get().replace(",", "").replace("$", ""))
             margen = float(self.vars["margen"].get())
             lookback = int(self.vars["lookback"].get())
+            obtener = (
+                (lambda a, b: obtener_tasas_banxico(a, b, token))
+                if self.con_token
+                else obtener_tasas_sofr
+            )
             d_b, d_c, tasa, tasa_final, intereses, producto, detalle, final_periodo = calcular(
-                capital, inicio, final, margen, lookback, token, dec_calc, dec_tasa
+                capital, inicio, final, margen, lookback, dec_calc, dec_tasa,
+                self._feriados, obtener,
             )
         except ValueError as e:
             messagebox.showerror("Error", str(e))
             return
         except Exception as e:
-            messagebox.showerror("Error", f"Fallo al consultar Banxico: {e}")
+            messagebox.showerror("Error", f"Fallo al consultar la API: {e}")
             return
 
         d = dec_tasa
@@ -297,11 +345,13 @@ class App(tk.Tk):
 
         linea(f"Periodo de intereses: {inicio} a {final_periodo}  (pago: {final})")
         linea(f"Días hábiles: {d_b} | Días calendario: {d_c} | Lookback: {lookback}")
+        calendario = "CNBV/México" if self.con_token else "FED/EE. UU."
+        linea(f"Metodología: {self.metodo} (calendario {calendario})")
         linea(f"Decimales cálculo: {dec_calc} | Decimales tasa: {dec_tasa}")
         linea("")
         linea("--- Paso 2: Compuesto del periodo ---", "titulo")
         linea(f"Producto de factores: {producto:.{max(dec_calc, 8)}f}")
-        linea(f"Tasa compuesta TIIE: {tasa:.{d}f} %", "dato")
+        linea(f"Tasa compuesta {self.metodo}: {tasa:.{d}f} %", "dato")
         linea("")
         linea("--- Paso 3: Tasa Integrada ---", "titulo")
         linea(f"Tasa integrada: {tasa:.{d}f}% + {margen:.{d}f}% = {tasa_final:.{d}f}%", "dato")
@@ -320,6 +370,76 @@ class App(tk.Tk):
             + r" = " + rf"{tasa_final:.{d}f}\%",
         ]
         self.mostrar_latex(formulas)
+
+
+class App(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Lookback in Arreas")
+        self.configure(bg="#FFFFFF")
+        try:
+            self.state("zoomed")
+        except tk.TclError:
+            self.attributes("-zoomed", True)
+
+        style = ttk.Style(self)
+        style.theme_use("clam")
+        for metodo, p in (("TIIE", PALETA_TIIE), ("SOFR", PALETA_SOFR)):
+            style.configure(
+                f"{metodo}.Treeview",
+                background=p["campo"], fieldbackground=p["campo"], foreground="#000000",
+                font=("Consolas", 9), rowheight=20,
+            )
+            style.configure(
+                f"{metodo}.Treeview.Heading",
+                background=p["enc_tabla"], foreground="#000000",
+                font=("Segoe UI", 9, "bold"),
+            )
+        style.configure("TNotebook", background="#DDDDDD")
+
+        barra = tk.Frame(self, bg="#333333")
+        barra.pack(fill="x")
+        self.contenido = tk.Frame(self, bg="#FFFFFF")
+        self.contenido.pack(fill="both", expand=True)
+
+        self.tab_tiie = Pestana(self.contenido, "TIIE", PALETA_TIIE, True, holidays.Mexico())
+        self.tab_sofr = Pestana(self.contenido, "SOFR", PALETA_SOFR, False, holidays.US())
+
+        self.btns = {}
+        for metodo, texto in (("TIIE", " TIIE (Banxico) "), ("SOFR", " SOFR (FED) ")):
+            btn = tk.Button(
+                barra, text=texto, bd=0, relief="flat", cursor="hand2",
+                font=("Segoe UI", 11, "bold"), padx=18, pady=7,
+                command=lambda m=metodo: self.mostrar(m),
+            )
+            btn.pack(side="left", padx=(10, 0), pady=6)
+            self.btns[metodo] = btn
+
+        self.actual = None
+        self.mostrar("TIIE")
+
+    def mostrar(self, metodo):
+        if self.actual == metodo:
+            return
+        if self.actual == "TIIE":
+            self.tab_tiie.pack_forget()
+        elif self.actual == "SOFR":
+            self.tab_sofr.pack_forget()
+        if metodo == "TIIE":
+            self.tab_tiie.pack(fill="both", expand=True)
+        else:
+            self.tab_sofr.pack(fill="both", expand=True)
+        self.actual = metodo
+
+        for m, btn in self.btns.items():
+            p = PALETA_TIIE if m == "TIIE" else PALETA_SOFR
+            activo = m == metodo
+            btn.configure(
+                bg=p["tab"] if activo else p["tab_unsel"],
+                fg=p["tab_txt"] if activo else p["tab_unsel_txt"],
+                activebackground=p["tab_sel"] if activo else p["tab_unsel"],
+                activeforeground=p["tab_txt"] if activo else p["tab_unsel_txt"],
+            )
 
 
 if __name__ == "__main__":

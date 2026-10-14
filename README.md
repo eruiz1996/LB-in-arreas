@@ -1,18 +1,25 @@
 # LB-in-arreas
 
-Programa para calcular intereses bajo la metodología de tasa **Lookback in Arreas**, usando tasas del Banco de México (Banxico).
+Programa para calcular intereses bajo la metodología de tasa **Lookback in Arreas**, con dos variantes:
+
+| Pestaña | Tasa | Fuente | Calendario | Token |
+|---|---|---|---|---|
+| **TIIE** | TIIE diaria (serie `SF331451`) | [API de Banxico](https://www.banxico.org.mx/SieAPIRest/service/v1/token) | Días hábiles de la Comisión Nacional Bancaria y de Valores (sin fines de semana ni feriados de México) | Requerido |
+| **SOFR** | SOFR diaria | [NY Fed Markets Data API](https://markets.newyorkfed.org/static/docs/markets-api.html) | Días inhábiles de la Reserva Federal (sin fines de semana ni feriados de EE. UU.) | No requiere |
 
 ## Características
 
-- Periodo de intereses calculado solo con **días hábiles de la Comisión Nacional Bancaria y de Valores** (sin fines de semana ni feriados de México).
-- Obtención de tasas vía API de Banxico (serie `SF331451`, TIIE diaria). El token se genera en la [página oficial de la SIE-API de Banxico](https://www.banxico.org.mx/SieAPIRest/service/v1/token).
+- Periodo de intereses calculado solo con días hábiles del calendario correspondiente (CNBV para TIIE, FED para SOFR).
+- Obtención de tasas vía APIs:
+  - **TIIE**: `GET https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF331451/datos/{ini}/{fin}` (requiere el token que se genera en la [página oficial de la SIE-API de Banxico](https://www.banxico.org.mx/SieAPIRest/service/v1/token); fechas de respuesta en formato `dd/mm/aaaa`).
+  - **SOFR**: `GET https://markets.newyorkfed.org/api/rates/secured/sofr/search.json?startDate=aaaa-mm-dd&endDate=aaaa-mm-dd` (sin token; fechas de respuesta en formato `aaaa-mm-dd`).
 - Tasa compuesta capitalizando diariamente:
 
   $$\text{Tasa}=\left[\prod _{i=1}^{d_{b}}\left(1+\frac{R_{i}\times n_{i}}{N}\right)-1\right]\times \frac{N}{d_{c}}$$
 
 - Redondeo configurable: decimales de cálculo (factores, por defecto 8) y decimales de tasa (por defecto 4).
-- Intereses con base 360 días.
-- Interfaz gráfica en Tkinter con calendarios desplegables (`tkcalendar`).
+- Intereses con base 360 días (convención ACT/360).
+- Interfaz gráfica en Tkinter con pestañas diferenciadas por color (TIIE rojo Santander, SOFR turquesa), calendarios desplegables (`tkcalendar`), tabla del desglose diario y fórmulas LaTeX de la tasa.
 - Desglose paso a paso del cálculo.
 
 ## Instalación
@@ -21,7 +28,7 @@ Programa para calcular intereses bajo la metodología de tasa **Lookback in Arre
 pip install -r requirements.txt
 ```
 
-Al ejecutar, el programa pide el token de Banxico (se genera una sola vez en la [página oficial del token](https://www.banxico.org.mx/SieAPIRest/service/v1/token); cada usuario ingresa el suyo).
+Al ejecutar, la consola pregunta primero por la metodología (`TIIE` o `SOFR`, por defecto TIIE). Solo en TIIE pide el token de Banxico (se genera una sola vez en la [página oficial del token](https://www.banxico.org.mx/SieAPIRest/service/v1/token); cada usuario ingresa el suyo). SOFR no requiere token.
 
 ## Uso
 
@@ -37,7 +44,7 @@ Interfaz gráfica:
 python lb_gui.py
 ```
 
-Datos solicitados: fecha inicio, fecha fin (día de pago; el periodo corre hasta el día anterior), saldo insoluto, margen (%), lookback (días hábiles de desfase), token de Banxico, decimales de cálculo (factores, por defecto 8) y decimales de tasa (por defecto 4).
+La interfaz tiene dos pestañas —**TIIE** y **SOFR**— con los mismos campos (fecha inicio, fecha fin como día de pago, saldo insoluto, margen, lookback, decimales de cálculo y de tasa). La pestaña TIIE incluye además el campo de token; SOFR no lo necesita.
 
 ## Estructura
 

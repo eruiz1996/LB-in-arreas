@@ -51,3 +51,7 @@ La interfaz tiene dos pestañas —**TIIE** y **SOFR**— con los mismos campos 
 - `lb_in_arreas.py` — lógica de cálculo (consola).
 - `lb_gui.py` — interfaz gráfica Tkinter.
 - `requirements.txt` — dependencias.
+
+## Licencia
+
+Distribuido bajo la licencia [MIT](LICENSE).

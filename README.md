@@ -5,12 +5,12 @@ Programa para calcular intereses bajo la metodología de tasa **Lookback in Arre
 ## Características
 
 - Periodo de intereses calculado solo con **días hábiles de la Comisión Nacional Bancaria y de Valores** (sin fines de semana ni feriados de México).
-- Obtención de tasas vía API de Banxico (serie `SF331451`, TIIE diaria).
+- Obtención de tasas vía API de Banxico (serie `SF331451`, TIIE diaria). El token se genera en la [página oficial de la SIE-API de Banxico](https://www.banxico.org.mx/SieAPIRest/service/v1/token).
 - Tasa compuesta capitalizando diariamente:
 
   $$\text{Tasa}=\left[\prod _{i=1}^{d_{b}}\left(1+\frac{R_{i}\times n_{i}}{N}\right)-1\right]\times \frac{N}{d_{c}}$$
 
-- Redondeo a 8 decimales.
+- Redondeo configurable: decimales de cálculo (factores, por defecto 8) y decimales de tasa (por defecto 4).
 - Intereses con base 360 días.
 - Interfaz gráfica en Tkinter con calendarios desplegables (`tkcalendar`).
 - Desglose paso a paso del cálculo.
@@ -21,7 +21,7 @@ Programa para calcular intereses bajo la metodología de tasa **Lookback in Arre
 pip install -r requirements.txt
 ```
 
-Al ejecutar, el programa pide el `BANXICO_TOKEN` (se solicita una sola vez; cada usuario ingresa el suyo).
+Al ejecutar, el programa pide el token de Banxico (se genera una sola vez en la [página oficial del token](https://www.banxico.org.mx/SieAPIRest/service/v1/token); cada usuario ingresa el suyo).
 
 ## Uso
 

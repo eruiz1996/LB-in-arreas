@@ -4,11 +4,11 @@ Programa para calcular intereses bajo la metodología de tasa **Lookback in Arre
 
 ## Características
 
-- Periodo de intereses calculado solo con **días hábiles de la CNBV** (sin fines de semana ni feriados de México).
+- Periodo de intereses calculado solo con **días hábiles de la Comisión Nacional Bancaria y de Valores** (sin fines de semana ni feriados de México).
 - Obtención de tasas vía API de Banxico (serie `SF331451`, TIIE diaria).
 - Tasa compuesta capitalizando diariamente:
 
-  `Tasa = [ ∏ (1 + R_i · n_i / 360) − 1 ] × 360 / d_c`
+  $$\text{Tasa}=\left[\prod _{i=1}^{d_{b}}\left(1+\frac{R_{i}\times n_{i}}{N}\right)-1\right]\times \frac{N}{d_{c}}$$
 
 - Redondeo a 8 decimales.
 - Intereses con base 360 días.
@@ -19,8 +19,9 @@ Programa para calcular intereses bajo la metodología de tasa **Lookback in Arre
 
 ```bash
 pip install -r requirements.txt
-setx BANXICO_TOKEN "tu_token_de_banxico"
 ```
+
+Al ejecutar, el programa pide el `BANXICO_TOKEN` (se solicita una sola vez; cada usuario ingresa el suyo).
 
 ## Uso
 

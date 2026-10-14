@@ -1,14 +1,9 @@
-import os
-
 import sys
 from datetime import datetime, date, timedelta
 
 import holidays
 import requests
 
-TOKEN = os.environ.get("BANXICO_TOKEN")
-if not TOKEN:
-    raise SystemExit("Define la variable de entorno BANXICO_TOKEN con tu token de Banxico.")
 SERIE = "SF331451"
 URL = (
     "https://www.banxico.org.mx/SieAPIRest/service/v1/series/"
@@ -31,10 +26,10 @@ def dias_habiles(a, b, feriados):
     return out
 
 
-def obtener_tasas_banxico(ini, fin):
+def obtener_tasas_banxico(ini, fin, token):
     r = requests.get(
         URL.format(ini=ini.strftime("%Y-%m-%d"), fin=fin.strftime("%Y-%m-%d")),
-        headers={"Bmx-Token": TOKEN},
+        headers={"Bmx-Token": token},
         timeout=30,
     )
     r.raise_for_status()
@@ -48,6 +43,7 @@ def obtener_tasas_banxico(ini, fin):
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
+    token = input("Token de Banxico: ").strip()
     capital = float(input("Capital: "))
     inicio = datetime.strptime(input("Fecha inicio (AAAA-MM-DD): "), "%Y-%m-%d").date()
     final = datetime.strptime(input("Fecha fin (AAAA-MM-DD): "), "%Y-%m-%d").date()
@@ -66,7 +62,7 @@ def main():
 
     # Días hábiles con tasas (para desfase lookback se consulta antes del inicio)
     ventana_ini = inicio - timedelta(days=max(60, lookback * 3))
-    tasas_pub = obtener_tasas_banxico(ventana_ini, final_periodo)
+    tasas_pub = obtener_tasas_banxico(ventana_ini, final_periodo, token)
     fechas_tasas = sorted(tasas_pub)
 
     # Para cada día hábil i del periodo, la tasa aplica es la publicada

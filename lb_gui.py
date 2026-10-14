@@ -1,6 +1,6 @@
 import tkinter as tk
 from datetime import datetime, timedelta
-from tkinter import messagebox, ttk
+from tkinter import messagebox, simpledialog, ttk
 
 import holidays
 from tkcalendar import Calendar
@@ -16,7 +16,7 @@ MELOCOTON = "#FCD898"
 TEXTO = "#000000"
 
 
-def calcular(capital, inicio, final, margen, lookback):
+def calcular(capital, inicio, final, margen, lookback, token):
     feriados = holidays.Mexico()
     final_periodo = final - timedelta(days=1)
     periodo = dias_habiles(inicio, final_periodo, feriados)
@@ -27,7 +27,7 @@ def calcular(capital, inicio, final, margen, lookback):
     d_b = len(periodo)
 
     ventana_ini = inicio - timedelta(days=max(60, lookback * 3))
-    tasas_pub = obtener_tasas_banxico(ventana_ini, final_periodo)
+    tasas_pub = obtener_tasas_banxico(ventana_ini, final_periodo, token)
     fechas_tasas = sorted(tasas_pub)
     indices = {f: i for i, f in enumerate(fechas_tasas)}
 
@@ -81,6 +81,7 @@ class App(tk.Tk):
         super().__init__()
         self.title("Lookback in Arreas")
         self.configure(bg=FONDO)
+        self.token = None
 
         style = ttk.Style(self)
         style.theme_use("clam")
@@ -137,6 +138,12 @@ class App(tk.Tk):
         self.resultado.config(state="disabled")
 
     def on_calcular(self):
+        if not self.token:
+            self.token = simpledialog.askstring(
+                "Token", "Token de Banxico:", show="*", parent=self
+            )
+            if not self.token:
+                return
         try:
             inicio = datetime.strptime(self.vars["inicio"].get().strip(), "%Y-%m-%d").date()
             final = datetime.strptime(self.vars["final"].get().strip(), "%Y-%m-%d").date()
@@ -144,7 +151,7 @@ class App(tk.Tk):
             margen = float(self.vars["margen"].get())
             lookback = int(self.vars["lookback"].get())
             d_b, d_c, tasa, tasa_final, intereses, producto, detalle, final_periodo = calcular(
-                capital, inicio, final, margen, lookback
+                capital, inicio, final, margen, lookback, self.token
             )
         except ValueError as e:
             messagebox.showerror("Error", str(e))

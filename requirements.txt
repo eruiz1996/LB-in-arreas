@@ -1,3 +1,4 @@
 requests
 holidays
 tkcalendar  
+matplotlib  

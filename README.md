@@ -37,7 +37,7 @@ Interfaz gráfica:
 python lb_gui.py
 ```
 
-Datos solicitados: fecha inicio, fecha fin (día de pago; el periodo corre hasta el día anterior), saldo insoluto, margen (%), lookback (días hábiles de desfase), token de Banxico y decimales de redondeo (6 a 12, por defecto 8).
+Datos solicitados: fecha inicio, fecha fin (día de pago; el periodo corre hasta el día anterior), saldo insoluto, margen (%), lookback (días hábiles de desfase), token de Banxico, decimales de cálculo (factores, por defecto 8) y decimales de tasa (por defecto 4).
 
 ## Estructura
 

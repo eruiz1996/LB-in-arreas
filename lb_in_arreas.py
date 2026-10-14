@@ -49,10 +49,12 @@ def main():
     final = datetime.strptime(input("Fecha fin (AAAA-MM-DD): "), "%Y-%m-%d").date()
     margen = float(input("Margen (%): "))
     lookback = int(input("Lookback (días hábiles): "))
-    dec_txt = input("Decimales de redondeo (6-12, Enter=8): ").strip()
-    decimales = int(dec_txt) if dec_txt else 8
-    if not 6 <= decimales <= 12:
-        print("Los decimales deben estar entre 6 y 12.")
+    dec_calc_txt = input("Decimales cálculo (Enter=8): ").strip()
+    dec_calc = int(dec_calc_txt) if dec_calc_txt else 8
+    dec_tasa_txt = input("Decimales tasa (Enter=4): ").strip()
+    dec_tasa = int(dec_tasa_txt) if dec_tasa_txt else 4
+    if dec_calc < 0 or dec_tasa < 0:
+        print("Los decimales deben ser enteros positivos.")
         return
 
     feriados = holidays.Mexico()
@@ -86,7 +88,7 @@ def main():
         R = tasas_pub[fecha_tas]
         siguiente = periodo[i + 1] if i + 1 < len(periodo) else final
         n_i = (siguiente - dia).days
-        factor = 1 + R * n_i / 360.0
+        factor = round(1 + R * n_i / 360.0, dec_calc)
         producto *= factor
         detalle.append((dia, fecha_tas, R, n_i, factor))
 
@@ -95,27 +97,28 @@ def main():
         return
 
     tasa_compuesta = (producto - 1) * 360.0 / d_c
-    tasa_compuesta_pct = round(tasa_compuesta * 100, decimales)
-    tasa_final_pct = round(tasa_compuesta_pct + margen, decimales)
+    tasa_compuesta_pct = round(tasa_compuesta * 100, dec_tasa)
+    tasa_final_pct = round(tasa_compuesta_pct + margen, dec_tasa)
     intereses = capital * (tasa_final_pct / 100.0) * d_c / 360.0
 
     print("\n----- L O O K B A C K   I N   A R R E A S -----")
     print(f"Capital:           ${capital:,.2f}")
     print(f"Periodo:           {inicio} a {final}")
-    print(f"Días hábiles(d_b): {d_b} | Días calendario(d_c): {d_c} | Lookback: {lookback} | Decimales: {decimales}")
+    print(f"Días hábiles(d_b): {d_b} | Días calendario(d_c): {d_c} | Lookback: {lookback}")
+    print(f"Decimales cálculo: {dec_calc} | Decimales tasa: {dec_tasa}")
     print("\n--- Paso 1: Desglose diario (lookback in arreas) ---")
-    print(f"{'Día periodo':<12}{'Tasa pub. en':<14}{'R (%)':>8}{'n_i':>5}{'Factor (1+R·n/360)':>20}")
+    print(f"{'Día periodo':<12}{'Tasa pub. en':<14}{'R (%)':>8}{'n_i':>5}{'Factor (1+R·n/360)':>{20+max(dec_calc-8,0)}}")
     for dia, fecha_tas, R, n_i, factor in detalle:
-        print(f"{dia!s:<12}{fecha_tas!s:<14}{R*100:>8.4f}{n_i:>5}{factor:>20.8f}")
+        print(f"{dia!s:<12}{fecha_tas!s:<14}{R*100:>8.4f}{n_i:>5}{factor:>{20+max(dec_calc-8,0)}.{dec_calc}f}")
     print(f"\n--- Paso 2: Compuesto del periodo ---")
-    print(f"Producto de factores:  {producto:.10f}")
-    print(f"Producto - 1:          {producto - 1:.10f}")
-    print(f"Tasa = (prod-1)×360/{d_c}: {tasa_compuesta*100:.{decimales}f} %")
-    print(f"Tasa compuesta (redondeo {decimales} dec): {tasa_compuesta_pct:.{decimales}f} %")
+    print(f"Producto de factores:  {producto:.{max(dec_calc,10)}f}")
+    print(f"Producto - 1:          {producto - 1:.{max(dec_calc,10)}f}")
+    print(f"Tasa = (prod-1)×360/{d_c}: {tasa_compuesta*100:.{dec_tasa}f} %")
+    print(f"Tasa compuesta (redondeo {dec_tasa} dec): {tasa_compuesta_pct:.{dec_tasa}f} %")
     print(f"\n--- Paso 3: Tasa Integrada ---")
-    print(f"Tasa final = {tasa_compuesta_pct:.{decimales}f} + {margen:.{decimales}f} = {tasa_final_pct:.{decimales}f} %")
+    print(f"Tasa final = {tasa_compuesta_pct:.{dec_tasa}f} + {margen:.{dec_tasa}f} = {tasa_final_pct:.{dec_tasa}f} %")
     print(f"\n--- Paso 4: Intereses (base 360) ---")
-    print(f"Intereses = ${capital:,.2f} × {tasa_final_pct:.{decimales}f}% × {d_c}/360")
+    print(f"Intereses = ${capital:,.2f} × {tasa_final_pct:.{dec_tasa}f}% × {d_c}/360")
     print(f"          = ${capital * (tasa_final_pct/100.0):,.2f} × {d_c}/360")
     print(f"          = ${intereses:,.2f}")
 
